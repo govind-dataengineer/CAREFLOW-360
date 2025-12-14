@@ -1,0 +1,151 @@
+-- Databricks sql warehouse table creation: 
+
+CREATE TABLE IF NOT EXISTS carefolow_360.dim_patient (
+    surrogate_key BIGINT,
+    patient_id STRING,
+    gender STRING,
+    age INT,
+    effective_date TIMESTAMP,
+    effective_to TIMESTAMP,
+    is_current BOOLEAN,
+    _has STRING
+)
+USING DELTA
+LOCATION "abfss://gold@stcareflow360.dfs.core.windows.net/dim_patient";
+
+
+
+CREATE TABLE IF NOT EXISTS carefolow_360.dim_department (
+    surrogate_key BIGINT,
+    department STRING,
+    hospital_id INT
+)
+USING DELTA
+LOCATION 'abfss://gold@stcareflow360.dfs.core.windows.net/dim_department';
+
+
+
+CREATE TABLE IF NOT EXISTS carefolow_360.fact_admissions (
+    fact_id BIGINT,
+    patient_sk BIGINT,
+    department_sk BIGINT,
+    admission_time TIMESTAMP,
+    discharge_time TIMESTAMP,
+    admission_date DATE,
+    length_of_stay_hours DOUBLE,
+    is_currently_admitted BOOLEAN,
+    bed_id INT,
+    event_ingestion_time TIMESTAMP
+)
+USING DELTA
+PARTITIONED BY (admission_date)
+LOCATION 'abfss://gold@stcareflow360.dfs.core.windows.net/fact_patient_flow';
+LOCATION 'dbfs:/mnt/carefolow-360/fact_admissions';
+
+
+
+
+----------------------------
+
+
+SELECT * FROM carefolow_360.dim_patient;
+
+SELECT * FROM carefolow_360.dim_department;
+
+SELECT * FROM carefolow_360.fact_admissions;
+
+
+-- KPI.
+
+-- 1. Beds Occupied total
+create or replace view carefolow_360.vw_bed_occupancy as 
+select 
+  p.gender,
+  count(case when F.is_currently_admitted = true then f.bed_id end) * 1.0 / count(f.bed_id) * 100 as bed_occupancy_percent
+from carefolow_360.dim_patient p
+INNER JOIN carefolow_360.fact_admissions f
+on p.surrogate_key = f.patient_sk
+group by p.gender;
+	
+-- 2. Total bed turnover
+
+create or replace view carefolow_360.vw_bed_turnover_rate as
+select 
+  p.gender,
+  count(distinct f.fact_id) * 1.0 / count(distinct f.bed_id) as bed_turnover_rate
+from carefolow_360.dim_patient p
+INNER JOIN carefolow_360.fact_admissions f
+on p.surrogate_key = f.patient_sk
+group by p.gender;
+
+-- 3. Total Patients. 
+create or replace view carefolow_360.vw_patient_demographics as
+select 
+  p.gender,
+  count(case when F.is_currently_admitted = true then f.fact_id end) as total_patients
+from carefolow_360.dim_patient p
+INNER JOIN carefolow_360.fact_admissions f
+on p.surrogate_key = f.patient_sk
+group by p.gender;
+
+
+-- 4. Avg Treatment duration
+create or replace view carefolow_360.vw_avg_treatment_duration as
+select 
+  d.department,
+  p.gender,
+  avg(f.length_of_stay_hours) as avg_treatment_duration
+from carefolow_360.dim_patient p
+INNER JOIN carefolow_360.fact_admissions f
+on p.surrogate_key = f.patient_sk
+INNER JOIN carefolow_360.dim_department d
+on f.department_sk = d.surrogate_key  
+group by d.department, p.gender;
+
+
+-- Chart's
+
+-- 1. Total Patient counts over time.
+create or replace view carefolow_360.vw_patient_volume_trend as 
+select 
+  f.admission_time,
+  p.gender,
+  count(distinct f.fact_id) as patient_count
+from carefolow_360.dim_patient p
+INNER JOIN carefolow_360.fact_admissions f
+on p.surrogate_key = f.patient_sk
+INNER JOIN carefolow_360.dim_department d
+on f.department_sk = d.surrogate_key  
+group by f.admission_time,p.gender;
+
+
+-- 3. Total Patients over department
+create or replace view carefolow_360.vw_deparment_inflow as 
+select 
+  d.department,
+  p.gender,
+  count(distinct f.fact_id) as patient_count
+from carefolow_360.dim_patient p
+INNER JOIN carefolow_360.fact_admissions f
+on p.surrogate_key = f.patient_sk
+INNER JOIN carefolow_360.dim_department d
+on f.department_sk = d.surrogate_key  
+group by d.department,p.gender;
+
+
+-- 4. Total Overstay patients count
+
+create or replace view carefolow_360.vw_overstay_patient as
+select 
+  d.department,
+  p.gender,
+  count(f.fact_id) as overstay_count
+from carefolow_360.dim_patient p
+INNER JOIN carefolow_360.fact_admissions f
+on p.surrogate_key = f.patient_sk
+INNER JOIN carefolow_360.dim_department d
+on f.department_sk = d.surrogate_key  
+where f.length_of_stay_hours > 50
+group by d.department,p.gender;
+
+
