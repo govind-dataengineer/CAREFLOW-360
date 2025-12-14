@@ -1,0 +1,47 @@
+
+---
+
+## 📊 Key Metrics & KPIs
+
+- Bed Occupancy % (by hospital / department)
+- Average Length of Stay (ALOS)
+- Admission vs Discharge trends
+- Department load in near real-time
+- Peak-hour congestion analysis
+
+---
+
+## 🔐 Security & Best Practices
+
+- No secrets stored in code
+- Azure Key Vault integrated with Databricks secret scopes
+- Managed Identity / Access Connector used for ADLS access
+- Schema enforcement using Delta Lake
+- Checkpointing for streaming reliability
+
+---
+
+## 🚀 Future Enhancements
+
+- Predictive bed occupancy using ML
+- Alerting for threshold breaches
+- Integration with HL7 / FHIR standards
+- Unity Catalog for governance & lineage
+
+---
+
+## 👨‍💻 Author
+
+**Govind Singh Bora**  
+Senior Data Engineer | Azure | Databricks | Streaming Systems  
+
+---
+
+## ⭐ Why This Project Matters
+
+This project demonstrates:
+- Real-world healthcare use case
+- Streaming + batch architecture
+- Cloud-native Azure design
+- Production-grade data engineering practices
+
